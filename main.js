@@ -11,6 +11,7 @@ const rateDiv = document.getElementById("rate");
 let page = 1;
 let currentUsername = "";
 let controller = null;
+let reposCache = []; // ★これ追加（重要）
 
 // =========================
 // イベント
@@ -26,28 +27,6 @@ nextBtn.addEventListener("click", () => {
   fetchRepos(currentUsername);
 });
 
-// reposクリック（イベント委譲）
-reposDiv.addEventListener("click", async (e) => {
-  const repoEl = e.target.closest(".repo");
-  if (!repoEl) return;
-
-  const owner = repoEl.dataset.owner;
-  const name = repoEl.dataset.name;
-
-  // commits取得
-  const data = await fetchData(
-    `https://api.github.com/repos/${owner}/${name}/commits`
-  );
-  if (!data) return;
-
-  commitsDiv.innerHTML = data.slice(0, 5).map(c => `
-    <div>${c.commit.message}</div>
-  `).join("");
-
-  // repo詳細表示
-  showRepoDetail({ name, owner: { login: owner } });
-});
-
 // =========================
 // 検索開始
 // =========================
@@ -61,7 +40,7 @@ function startSearch() {
 }
 
 // =========================
-// 共通 fetch（Abort対応）
+// 共通 fetch
 // =========================
 async function fetchData(url) {
   if (controller) controller.abort();
@@ -115,6 +94,8 @@ async function fetchRepos(username) {
   );
   if (!data) return;
 
+  reposCache = data; // ★保存
+
   if (data.length === 0) {
     reposDiv.innerHTML = "<p>リポジトリなし</p>";
     return;
@@ -122,27 +103,42 @@ async function fetchRepos(username) {
 
   data.sort((a, b) => b.stargazers_count - a.stargazers_count);
 
-  reposDiv.innerHTML = data.map(repo => `
-    <div class="repo"
-         data-owner="${repo.owner.login}"
-         data-name="${repo.name}">
+  reposDiv.innerHTML = data.map((repo, index) => `
+    <div class="repo-item" data-index="${index}" style="cursor:pointer;">
       ⭐ ${repo.stargazers_count} - ${repo.name}
     </div>
   `).join("");
 }
 
 // =========================
-// repo詳細表示
+// ★イベント委譲（ここが本体）
+// =========================
+reposDiv.addEventListener("click", async (e) => {
+  const repoEl = e.target.closest(".repo-item");
+  if (!repoEl) return;
+
+  const index = repoEl.dataset.index;
+  const repo = reposCache[index];
+
+  showRepoDetail(repo);
+});
+
+// =========================
+// 詳細表示
 // =========================
 function showRepoDetail(repo) {
-  profileDiv.innerHTML += `
-    <hr>
-    <h3>選択中: ${repo.name}</h3>
+  const detailDiv = document.getElementById("repo-detail");
+
+  detailDiv.innerHTML = `
+    <h3>${repo.name}</h3>
+    <p>⭐ ${repo.stargazers_count}</p>
+    <p>${repo.description || "説明なし"}</p>
+    <a href="${repo.html_url}" target="_blank">GitHubで見る</a>
   `;
 }
 
 // =========================
-// rate limit
+// Rate Limit
 // =========================
 async function fetchRateLimit() {
   const data = await fetchData("https://api.github.com/rate_limit");
