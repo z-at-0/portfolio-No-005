@@ -1,59 +1,32 @@
 const usernameInput = document.getElementById("username");
 const searchBtn = document.getElementById("searchBtn");
 const nextBtn = document.getElementById("nextBtn");
-
 const statusDiv = document.getElementById("status");
 const profileDiv = document.getElementById("profile");
 const reposDiv = document.getElementById("repos");
 const commitsDiv = document.getElementById("commits");
 const rateDiv = document.getElementById("rate");
-
 let page = 1;
 let currentUsername = "";
 let controller = null;
-
 // =========================
 // イベント
 // =========================
 searchBtn.addEventListener("click", () => startSearch());
-
 usernameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") startSearch();
 });
-
 nextBtn.addEventListener("click", () => {
   page++;
   fetchRepos(currentUsername);
 });
-
-// reposクリック（イベント委譲）
-reposDiv.addEventListener("click", async (e) => {
-  const repoEl = e.target.closest(".repo");
-  if (!repoEl) return;
-
-  const owner = repoEl.dataset.owner;
-  const name = repoEl.dataset.name;
-
-  // commits取得
-  const data = await fetchData(
-    `https://api.github.com/repos/${owner}/${name}/commits`
-  );
-  if (!data) return;
-
-  commitsDiv.innerHTML = data.slice(0, 5).map(c => `
-    <div>${c.commit.message}</div>
-  `).join("");
-
-  // repo詳細表示
-  showRepoDetail({ name, owner: { login: owner } });
-});
-
 // =========================
 // 検索開始
 // =========================
 function startSearch() {
   page = 1;
   currentUsername = usernameInput.value.trim();
+
   if (!currentUsername) return;
 
   fetchUser(currentUsername);
@@ -89,7 +62,6 @@ async function fetchData(url) {
     console.error(err);
   }
 }
-
 // =========================
 // ユーザー取得
 // =========================
@@ -105,7 +77,6 @@ async function fetchUser(username) {
 
   fetchRepos(username);
 }
-
 // =========================
 // リポジトリ取得
 // =========================
@@ -120,33 +91,52 @@ async function fetchRepos(username) {
     return;
   }
 
+  // スター順ソート
   data.sort((a, b) => b.stargazers_count - a.stargazers_count);
 
   reposDiv.innerHTML = data.map(repo => `
-    <div class="repo"
-         data-owner="${repo.owner.login}"
-         data-name="${repo.name}">
+    <div class="repo" data-owner="${repo.owner.login}" data-name="${repo.name}">
       ⭐ ${repo.stargazers_count} - ${repo.name}
     </div>
   `).join("");
 }
+// =========================
+// コミット取得（イベント委譲）
+// =========================
+reposDiv.addEventListener("click", async (e) => {
+  const repoEl = e.target.closest(".repo");
+  if (!repoEl) return;
 
-// =========================
-// repo詳細表示
-// =========================
-function showRepoDetail(repo) {
-  profileDiv.innerHTML += `
-    <hr>
-    <h3>選択中: ${repo.name}</h3>
-  `;
-}
+  const owner = repoEl.dataset.owner;
+  const name = repoEl.dataset.name;
 
+  const data = await fetchData(
+    `https://api.github.com/repos/${owner}/${name}/commits`
+  );
+  if (!data) return;
+
+  commitsDiv.innerHTML = data.slice(0, 5).map(c => `
+    <div>
+      ${c.commit.message}
+    </div>
+  `).join("");
+});
 // =========================
-// rate limit
+// Rate Limit
 // =========================
 async function fetchRateLimit() {
   const data = await fetchData("https://api.github.com/rate_limit");
   if (!data) return;
 
   rateDiv.textContent = `残り回数: ${data.rate.remaining}`;
+}
+// =========================
+// debounce（おまけ）
+// =========================
+function debounce(fn, delay) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
 }
