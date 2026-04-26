@@ -154,6 +154,9 @@ async function fetchRepoCommits(owner, name) {
             ${c.commit.message.substring(0, 50)}...
         </div>
     `).join("");
+    // メッセージだけを配列にして表示
+    console.log("--- コミットメッセージ一覧 ---");
+    console.log(data.map(c => c.commit.message));
 }
 
 // =========================
